@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ImmoBird - Estimation immobilière par IA</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Animation du robot */
+        .loading-robot {
+            display: none;
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            z-index: 1000;
+            transition: all 0.5s ease;
+            left: 20px;
+        }
+
+        .robot {
+            width: 60px;
+            height: 80px;
+            background: linear-gradient(145deg, #2c3e50, #34495e);
+            border-radius: 15px;
+            position: relative;
+            animation: robot-move 2s ease-in-out infinite;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .robot:before {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #3498db;
+            border-radius: 50%;
+            top: 15px;
+            left: 10px;
+            box-shadow: 25px 0 0 #3498db;
+            animation: eyes-blink 3s infinite;
+        }
+
+        .robot:after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 10px;
+            background: #2980b9;
+            bottom: 15px;
+            left: 15px;
+            border-radius: 8px;
+            animation: mouth-talk 1s infinite;
+        }
+
+        .robot.happy:after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 15px;
+            background: #2980b9;
+            bottom: 15px;
+            left: 15px;
+            border-radius: 0 0 15px 15px;
+            animation: mouth-smile 2s infinite;
+        }
+
+        .robot-arm {
+            position: absolute;
+            width: 10px;
+            height: 30px;
+            background: linear-gradient(145deg, #2c3e50, #34495e);
+            top: 20px;
+            animation: arm-wave 2s ease-in-out infinite;
+            border-radius: 8px;
+        }
+
+        .robot-arm.left {
+            left: -10px;
+            transform-origin: top center;
+        }
+
+        .robot-arm.right {
+            right: -10px;
+            transform-origin: top center;
+        }
+
+        .robot-pointer {
+            position: absolute;
+            width: 4px;
+            height: 20px;
+            background: #3498db;
+            bottom: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 2px;
+        }
+
+        @keyframes robot-move {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(-5px) rotate(-2deg); }
+            75% { transform: translateY(-5px) rotate(2deg); }
+        }
+
+        @keyframes arm-wave {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-30deg); }
+            75% { transform: rotate(30deg); }
+        }
+
+        @keyframes eyes-blink {
+            0%, 45%, 55%, 100% { transform: scaleY(1); }
+            50% { transform: scaleY(0.1); }
+        }
+
+        @keyframes mouth-talk {
+            0%, 100% { transform: scaleY(1); }
+            50% { transform: scaleY(0.5); }
+        }
+
+        @keyframes mouth-smile {
+            0%, 100% { transform: scaleY(1); }
+            50% { transform: scaleY(0.8); }
+        }
+
+        .prediction-steps {
+            display: none;
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
+            min-height: 400px;
+        }
+
+        .step {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+            opacity: 0.5;
+            margin-left: 100px;
+        }
+
+        .step.active {
+            background: #e3f2fd;
+            opacity: 1;
+            transform: scale(1.02);
+        }
+
+        .step h4 {
+            color: #2c3e50;
+            margin: 0 0 5px 0;
+        }
+
+        .step p {
+            color: #666;
+            margin: 0;
+            font-size: 0.9em;
+        }
+
+        @keyframes slideDown {
+            from { 
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to { 
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .prediction-steps.show {
+            display: block;
+            animation: slideDown 0.5s ease forwards;
+        }
+
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 999;
+            backdrop-filter: blur(5px);
+            transition: all 0.3s ease;
+        }
+
+        .loading-text {
+            position: absolute;
+            bottom: 30%;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 1.2em;
+            text-align: center;
+            opacity: 0;
+            animation: fade-in 0.5s ease forwards;
+        }
+
+        @keyframes fade-in {
+            from { opacity: 0; transform: translate(-50%, 20px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+
+        .prediction-result {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        .prediction-result.show {
+            display: block;
+            animation: slideDown 0.5s ease forwards;
+        }
+
+        .prediction-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .prediction-logo {
+            width: 80px;
+            margin-bottom: 10px;
+        }
+
+        .prediction-value {
+            font-size: 2em;
+            color: #2c3e50;
+            margin: 10px 0;
+        }
+
+        .prediction-note {
+            font-size: 0.8em;
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+
+        .robot.happy .robot-arm {
+            animation: arms-up 2s ease-in-out infinite;
+        }
+
+        @keyframes arms-up {
+            0%, 100% { transform: rotate(-90deg); }
+            50% { transform: rotate(-80deg); }
+        }
+
+        .robot.happy .robot-arm.left {
+            left: -10px;
+            transform-origin: top center;
+        }
+
+        .robot.happy .robot-arm.right {
+            right: -10px;
+            transform-origin: top center;
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header__container">
+            <div class="header__logo">
+                <img src="ImmoBird_logo.png" alt="ImmoBird Logo" class="header__logo-img">
+            </div>
+            <nav class="header__nav">
+                <ul class="header__nav-list">
+                    <li><a href="#" class="header__nav-link">Accueil</a></li>
+                    <li><a href="#estimation" class="header__nav-link">Estimer mon bien</a></li>
+                    <li><a href="#about" class="header__nav-link">À propos</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="hero__container">
+                <h1 class="hero__title">Estimez la valeur de votre bien en quelques clics avec l'IA ImmoBird</h1>
+                <p class="hero__subtitle">Une estimation précise et rapide pour votre projet immobilier</p>
+                <a href="#estimation" class="hero__cta">Commencer l'estimation</a>
+            </div>
+        </section>
+
+        <section id="estimation" class="estimation">
+            <div class="estimation__container">
+                <h2 class="estimation__title">Estimation de votre bien</h2>
+                <form class="estimation__form" id="estimationForm">
+                    <div class="form__group">
+                        <label for="surface">Surface (m²)</label>
+                        <input type="number" id="surface" name="surface" required min="1">
+                    </div>
+
+                    <div class="form__group">
+                        <label for="year">Année de construction</label>
+                        <input type="number" id="year" name="year" required min="1800" max="2024">
+                    </div>
+
+                    <div class="form__group">
+                        <label for="location">Localisation</label>
+                        <select id="location" name="location" required>
+                            <option value="">Sélectionnez</option>
+                            <option value="Paris">Paris</option>
+                            <option value="Lyon">Lyon</option>
+                            <option value="Marseille">Marseille</option>
+                            <option value="Lille">Lille</option>
+                        </select>
+                    </div>
+
+                    <div class="form__group">
+                        <label for="condition">Condition du bien</label>
+                        <select id="condition" name="condition" required>
+                            <option value="">Sélectionnez</option>
+                            <option value="Poor">Mauvais état</option>
+                            <option value="Fair">État moyen</option>
+                            <option value="Good">Bon état</option>
+                            <option value="Excellent">Excellent état</option>
+                        </select>
+                    </div>
+
+                    <div class="form__group">
+                        <label for="garage">Garage</label>
+                        <select id="garage" name="garage" required>
+                            <option value="">Sélectionnez</option>
+                            <option value="Oui">Oui</option>
+                            <option value="Non">Non</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="estimation__submit">Obtenir une estimation</button>
+                </form>
+
+                <div class="prediction-steps" id="predictionSteps">
+                    <div class="loading-robot" id="loadingRobot">
+                        <div class="robot">
+                            <div class="robot-arm left"></div>
+                            <div class="robot-arm right"></div>
+                            <div class="robot-pointer"></div>
+                        </div>
+                    </div>
+                    <div class="step" id="step1">
+                        <h4>1. Collecte des données</h4>
+                        <p>Analyse des caractéristiques de votre bien immobilier</p>
+                    </div>
+                    <div class="step" id="step2">
+                        <h4>2. Prétraitement</h4>
+                        <p>Standardisation et encodage des variables</p>
+                    </div>
+                    <div class="step" id="step3">
+                        <h4>3. Analyse du marché</h4>
+                        <p>Comparaison avec les biens similaires</p>
+                    </div>
+                    <div class="step" id="step4">
+                        <h4>4. Calcul de l'estimation</h4>
+                        <p>Application de notre modèle d'IA avancé</p>
+                    </div>
+                    <div class="step" id="step5">
+                        <h4>5. Finalisation</h4>
+                        <p>Préparation du résultat final</p>
+                    </div>
+                </div>
+
+                <div id="predictionResult" class="prediction-result">
+                    <div class="prediction-content">
+                        <img src="ImmoBird_logo.png" alt="ImmoBird Logo" class="prediction-logo">
+                        <h3>Estimation de votre bien</h3>
+                        <p class="prediction-value" id="predictionValue"></p>
+                        <p class="prediction-note">Cette estimation est basée sur notre modèle d'IA et les données du marché immobilier.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="about" class="about">
+            <div class="about__container">
+                <h2 class="about__title">À propos d'ImmoBird</h2>
+                
+                <div class="about__content">
+                    <div class="about__mission">
+                        <h3>Notre Mission</h3>
+                        <p>ImmoBird révolutionne l'estimation immobilière en combinant l'expertise du marché immobilier avec la puissance de l'intelligence artificielle. Notre objectif est de rendre l'estimation immobilière plus accessible, plus précise et plus transparente pour tous.</p>
+                    </div>
+
+                    <div class="about__features">
+                        <h3>Notre Expertise</h3>
+                        <div class="features__grid">
+                            <div class="feature__card">
+                                <div class="feature__icon">🤖</div>
+                                <h4>IA Avancée</h4>
+                                <p>Notre modèle d'IA analyse des milliers de données immobilières pour fournir des estimations précises.</p>
+                            </div>
+                            <div class="feature__card">
+                                <div class="feature__icon">📊</div>
+                                <h4>Données en Temps Réel</h4>
+                                <p>Mise à jour constante des données du marché pour des estimations toujours pertinentes.</p>
+                            </div>
+                            <div class="feature__card">
+                                <div class="feature__icon">🎯</div>
+                                <h4>Précision</h4>
+                                <p>Des estimations fiables basées sur des critères objectifs et des analyses approfondies.</p>
+                            </div>
+                            <div class="feature__card">
+                                <div class="feature__icon">⚡</div>
+                                <h4>Rapidité</h4>
+                                <p>Obtenez une estimation en quelques secondes, sans rendez-vous ni attente.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="about__team">
+                        <h3>Notre Équipe</h3>
+                        <p>ImmoBird est porté par une équipe passionnée d'experts en immobilier, en data science et en développement. Notre expertise combinée nous permet de créer des solutions innovantes qui transforment l'expérience immobilière.</p>
+                    </div>
+
+                    <div class="about__values">
+                        <h3>Nos Valeurs</h3>
+                        <div class="values__list">
+                            <div class="value__item">
+                                <h4>Innovation</h4>
+                                <p>Nous repoussons constamment les limites de la technologie pour améliorer nos services.</p>
+                            </div>
+                            <div class="value__item">
+                                <h4>Transparence</h4>
+                                <p>Nous croyons en une approche claire et honnête de l'estimation immobilière.</p>
+                            </div>
+                            <div class="value__item">
+                                <h4>Accessibilité</h4>
+                                <p>Nous rendons l'estimation immobilière accessible à tous, partout en France.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="footer__container">
+            <p class="footer__copyright">© 2024 ImmoBird. Tous droits réservés.</p>
+            <div class="footer__links">
+                <a href="#" class="footer__link">Mentions légales</a>
+                <a href="#" class="footer__link">Politique de confidentialité</a>
+                <a href="#" class="footer__link">Contact</a>
+            </div>
+        </div>
+    </footer>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-robot" id="loadingRobot">
+            <div class="robot">
+                <div class="robot-arm left"></div>
+                <div class="robot-arm right"></div>
+                <div class="robot-pointer"></div>
+            </div>
+        </div>
+        <div class="loading-text">Analyse en cours...</div>
+    </div>
+
+    <script>
+        document.getElementById('estimationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Afficher les étapes
+            const stepsContainer = document.getElementById('predictionSteps');
+            stepsContainer.classList.add('show');
+            
+            // Afficher le robot
+            const robot = document.getElementById('loadingRobot');
+            robot.style.display = 'block';
+            
+            const formData = {
+                surface: document.getElementById('surface').value,
+                year: document.getElementById('year').value,
+                location: document.getElementById('location').value,
+                condition: document.getElementById('condition').value,
+                garage: document.getElementById('garage').value
+            };
+
+            // Animation des étapes
+            const steps = document.querySelectorAll('.step');
+            let currentStep = 0;
+
+            function moveRobotToStep(stepIndex) {
+                const step = steps[stepIndex];
+                const stepRect = step.getBoundingClientRect();
+                const containerRect = stepsContainer.getBoundingClientRect();
+                
+                robot.style.top = (stepRect.top - containerRect.top + stepRect.height/2 - 40) + 'px';
+                
+                steps.forEach(s => s.classList.remove('active'));
+                step.classList.add('active');
+            }
+
+            // Démarrer l'animation
+            moveRobotToStep(0);
+
+            const stepInterval = setInterval(() => {
+                if (currentStep < steps.length) {
+                    moveRobotToStep(currentStep);
+                    currentStep++;
+                } else {
+                    clearInterval(stepInterval);
+                }
+            }, 2000);
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+                
+                // Cacher le robot de chargement
+                robot.style.display = 'none';
+
+                if (data.success) {
+                    document.getElementById('predictionValue').textContent = data.formatted_prediction;
+                    document.getElementById('predictionResult').classList.add('show');
+                } else {
+                    alert('Erreur lors de l\'estimation : ' + data.error);
+                }
+            } catch (error) {
+                // Cacher le robot de chargement en cas d'erreur
+                robot.style.display = 'none';
+                
+                alert('Erreur lors de l\'estimation : ' + error);
+            }
+        });
+    </script>
+</body>
+</html> 
